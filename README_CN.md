@@ -541,41 +541,27 @@ Agent 会自动按照 skill 的流程执行。
 
 ## TODO / 路线图
 
-生产级异步 task 模式（欢迎 PR）：
+### 已完成
 
-- 将任务持久化到磁盘（替换 `InMemoryTaskStore`），使 `tasks/get` 在 gateway 重启后不丢
-- 提供更适合流式输出的路径（SSE / sendMessageStream）
-- Push notifications 支持（store + sender），用于超长任务的异步回调
-- 并发限制 / 队列：保护 OpenClaw gateway 不被大量入站 A2A 请求压垮
-- 可观测性：结构化日志 + 指标（任务耗时/超时/失败率）
+- ✅ **P0** 任务持久化 + 并发限制 + 结构化日志与指标 (PR #14)
+- ✅ **P1** 多轮对话支持，contextId 续聊 + history 携带 (PR #15)
+- ✅ **P2** 文件传输 (FilePart/DataPart) + SSRF 防护 + MIME 白名单 (PR #16)
+- ✅ **P3** Task TTL 自动清理，可配置过期时间 (PR #19)
+- ✅ **P4** SSE 流式输出 + 心跳 keep-alive (PR #21, #22)
+- ✅ **P5** Peer 健康检查 + 指数退避重试 + 熔断器 (PR #22)
+- ✅ **P6** 多 Token 支持，零停机轮换 (PR #23)
+- ✅ **P7** JSONL 审计日志 (PR #24)
 
-互操作与传输韧性（欢迎 PR）：
+### 待做（欢迎 PR）
 
-- Peer 健康检查 + retry/backoff + 熔断（按 peer 维度）
-- 自动传输降级（默认 JSON-RPC；在 JSON-RPC/REST/GRPC 之间按失败情况切换）
-- 跨实现兼容性测试矩阵（确保与其他 A2A server/client 互通）
-
-安全与鉴权增强（欢迎 PR）：
-
-- URI fetch 的 SSRF 防护 + allowlist（为 file parts 做准备）
-- 文件大小限制 + MIME allowlist + 内容嗅探
-- Token 轮换 / keyring（轮换窗口内同时接受多 token）
-- 入站/出站 A2A 调用审计日志（who/when/peer/taskId）
-
-路由与编排（欢迎 PR）：
-
-- 规则路由：按消息类型/标签自动选择 peer + 目标 OpenClaw agentId
-- 显式多轮对话支持（通过 taskId/contextId 传递上下文）
-
-文件 / 图像传输增强（欢迎 PR）：
-
-- ~~端到端支持 A2A `file` parts（URI + 可选 bytes/base64）~~ ✅ 已完成
-- ~~支持 A2A `data` parts（结构化 JSON）~~ ✅ 已完成
-- ~~Agent 工具 `a2a_send_file`，编程式发送文件~~ ✅ 已完成
-- 扩展 `a2a-send.mjs`：增加 `--file-uri` / `--file-path`，从命令行发送 `kind:"file"` parts
-- 从 Agent 文本回复中提取 URL（markdown 链接、裸 URL）为出站 FilePart
-- 插件侧处理：下载 URI 到临时文件（或安全透传 URI），再以安全引用的方式交给目标 OpenClaw agent
-- 安全：大小限制、mime allowlist、URI fetch 的 SSRF 防护、以及日志中对 bytes 的脱敏/禁止输出
+- 规则路由：按消息类型/标签/skill 自动选择 peer + 目标 agentId
+- 跨平台默认 tasksDir（`~/.openclaw/a2a-tasks`），兼容 Mac
+- DNS-based 动态 Agent 发现（mDNS/DNS-SD），替代硬编码 peer URL
+- Push notifications 支持（store + sender），超长任务异步回调
+- Metrics 端点鉴权（bearer auth 或 IP 白名单）
+- 自动传输降级（JSON-RPC → REST/gRPC）
+- 跨实现兼容性测试（Google reference server 等）
+- 从 Agent 文本回复中提取 URL 为出站 FilePart
 
 ## 许可证
 

@@ -553,46 +553,27 @@ The agent will follow the skill's procedure automatically.
 
 ## TODO / Roadmap
 
-Production-grade async task mode:
+### Completed
 
-- ~~Persist tasks to disk (replace `InMemoryTaskStore` with a durable store) so `tasks/get` survives gateway restarts~~ ✅ Done (PR #14)
-- Provide a streaming-first path (SSE / sendMessageStream) for incremental outputs
+- ✅ **P0** Persist tasks to disk, concurrency limits, structured logs + metrics (PR #14)
+- ✅ **P1** Multi-round conversation support with contextId/history (PR #15)
+- ✅ **P2** File transfer (FilePart/DataPart) + SSRF protections + MIME allowlist (PR #16)
+- ✅ **P3** Task TTL cleanup with configurable expiration (PR #19)
+- ✅ **P4** SSE streaming with heartbeat keep-alive (PR #21, #22)
+- ✅ **P5** Peer health checks + retry with exponential backoff + circuit breaker (PR #22)
+- ✅ **P6** Multi-token support for zero-downtime rotation (PR #23)
+- ✅ **P7** JSONL audit trail for A2A calls (PR #24)
+
+### Next
+
+- Rule-based routing: choose peer + target agentId based on message type/tags/skills
+- Cross-platform default tasksDir (`~/.openclaw/a2a-tasks`) for Mac compatibility
+- DNS-based dynamic agent discovery (mDNS/DNS-SD) instead of hardcoded peer URLs
 - Push notifications support (store + sender) for long-running tasks
-- ~~Concurrency limits / queueing for inbound A2A dispatch to protect the OpenClaw gateway~~ ✅ Done (PR #14)
-- ~~Observability: structured logs + metrics for task durations/timeouts~~ ✅ Done (PR #14)
-
-Multi-round conversation:
-
-- ~~Explicit multi-round conversation support (carry context via taskId/contextId)~~ ✅ Done (PR #15)
-
-Security & auth hardening:
-
-- ~~SSRF protections + allowlists for any URI fetching (needed for file parts)~~ ✅ Done (PR #16)
-- ~~File size limits + MIME allowlist + content sniffing~~ ✅ Done (PR #16)
-- Token rotation / keyring (accept multiple tokens during rotation window)
-- Audit log for inbound/outbound A2A calls (who/when/peer/taskId)
-- Task file TTL / cleanup (FileTaskStore files never expire)
-- Metrics endpoint authentication (currently unauthenticated)
-
-Interoperability & transport resilience:
-
-- Peer health checks + retry/backoff + circuit breaker (per-peer)
-- Automatic transport fallback (prefer JSON-RPC by default; fall back between JSON-RPC/REST/GRPC based on failures)
-- Cross-implementation compatibility test matrix (ensure interop with other A2A servers/clients)
-
-Routing & orchestration:
-
-- Rule-based routing: choose peer + target OpenClaw agentId based on message type/tags
-
-File / image transfer enhancements:
-
-- ~~Support A2A `file` parts end-to-end (URI + optional bytes/base64)~~ ✅ Done
-- ~~Support A2A `data` parts (structured JSON)~~ ✅ Done
-- ~~Agent tool `a2a_send_file` for programmatic file sending~~ ✅ Done
-- ~~Extend `a2a-send.mjs` with `--file-uri` / `--file-path` to send `kind:"file"` parts from CLI~~ ✅ Done (PR #16)
+- Metrics endpoint authentication (bearer auth or IP allowlist)
+- Automatic transport fallback (JSON-RPC → REST/gRPC)
+- Cross-implementation compatibility test matrix (Google reference server, etc.)
 - Extract URLs from agent text responses (markdown links, bare URLs) into outbound FileParts
-- ~~Plugin-side handling: fetch URI to a temp file (or pass URI through) and dispatch to the target OpenClaw agent with a safe reference~~ (handled via text serialization, PR #16)
-- ~~Security: size limits, mime allowlist, SSRF protections for URI fetches, and redaction of bytes in logs~~ ✅ Done (PR #16)
 
 ## License
 
