@@ -11,6 +11,12 @@
 - 你的 Agent 也可以 **主动调用对等 Agent**
 - 端到端支持 **A2A Part 类型**：`TextPart`、`FilePart`（URI + base64）、`DataPart`（结构化 JSON）
 - 提供 **`a2a_send_file` Agent 工具**，让 Agent 能以编程方式发送文件给 Peer
+- **SSE 流式输出** + 心跳 keep-alive，实时状态更新
+- **Peer 韧性**：健康检查 + 指数退避重试 + 熔断器
+- **多 Token 轮换**，零停机更换凭证
+- **JSONL 审计日志**，记录所有 A2A 调用和安全事件
+- **Ed25519 设备身份**，兼容 OpenClaw ≥2026.3.13 scope 验证（旧版本自动降级）
+- **跨平台**默认路径（`~/.openclaw/a2a-tasks`）
 
 ## 架构
 
@@ -551,13 +557,15 @@ Agent 会自动按照 skill 的流程执行。
 - ✅ **P5** Peer 健康检查 + 指数退避重试 + 熔断器 (PR #22)
 - ✅ **P6** 多 Token 支持，零停机轮换 (PR #23)
 - ✅ **P7** JSONL 审计日志 (PR #24)
+- ✅ **P9** 跨平台 tasksDir 默认路径 `~/.openclaw/a2a-tasks` (direct commit)
+- ✅ **v1.0.1** Ed25519 设备身份，兼容 OpenClaw ≥2026.3.13 scope 验证 (commit 84f440c)
+- ✅ Metrics 端点可选 bearer 鉴权（`observability.metricsAuth: "bearer"`）
 
 ### 待做（欢迎 PR）
 
 - 规则路由：按消息类型/标签/skill 自动选择 peer + 目标 agentId
 - DNS-based 动态 Agent 发现（mDNS/DNS-SD），替代硬编码 peer URL
 - Push notifications 支持（store + sender），超长任务异步回调
-- Metrics 端点鉴权（bearer auth 或 IP 白名单）
 - 自动传输降级（JSON-RPC → REST/gRPC）
 - 跨实现兼容性测试（Google reference server 等）
 - 从 Agent 文本回复中提取 URL 为出站 FilePart

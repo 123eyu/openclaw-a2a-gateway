@@ -13,6 +13,12 @@ An [OpenClaw](https://github.com/openclaw/openclaw) plugin that implements the [
 - Allows your agent to **call peer agents** via the A2A protocol
 - Handles **A2A Part types** end-to-end: `TextPart`, `FilePart` (URI + base64), and `DataPart` (structured JSON)
 - Provides an **`a2a_send_file` agent tool** so your agent can send files to peers programmatically
+- **SSE streaming** with heartbeat keep-alive for real-time status updates
+- **Peer resilience**: health checks, retry with exponential backoff, circuit breaker
+- **Multi-token rotation** for zero-downtime credential changes
+- **JSONL audit trail** for all A2A calls and security events
+- **Ed25519 device identity** for OpenClaw ≥2026.3.13 scope compatibility (auto-fallback for older versions)
+- **Cross-platform** default paths (`~/.openclaw/a2a-tasks`)
 
 ## Architecture
 
@@ -563,13 +569,15 @@ The agent will follow the skill's procedure automatically.
 - ✅ **P5** Peer health checks + retry with exponential backoff + circuit breaker (PR #22)
 - ✅ **P6** Multi-token support for zero-downtime rotation (PR #23)
 - ✅ **P7** JSONL audit trail for A2A calls (PR #24)
+- ✅ **P9** Cross-platform tasksDir default path `~/.openclaw/a2a-tasks` (direct commit)
+- ✅ **v1.0.1** Ed25519 device identity for OpenClaw ≥2026.3.13 scope compatibility (commit 84f440c)
+- ✅ Metrics endpoint optional bearer auth (`observability.metricsAuth: "bearer"`)
 
 ### Next
 
 - Rule-based routing: choose peer + target agentId based on message type/tags/skills
 - DNS-based dynamic agent discovery (mDNS/DNS-SD) instead of hardcoded peer URLs
 - Push notifications support (store + sender) for long-running tasks
-- Metrics endpoint authentication (bearer auth or IP allowlist)
 - Automatic transport fallback (JSON-RPC → REST/gRPC)
 - Cross-implementation compatibility test matrix (Google reference server, etc.)
 - Extract URLs from agent text responses (markdown links, bare URLs) into outbound FileParts

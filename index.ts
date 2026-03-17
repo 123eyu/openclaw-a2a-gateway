@@ -213,6 +213,7 @@ export function parseConfig(raw: unknown, resolvePath?: (nextPath: string) => st
       structuredLogs: asBoolean(observability.structuredLogs, true),
       exposeMetricsEndpoint: asBoolean(observability.exposeMetricsEndpoint, true),
       metricsPath: normalizeHttpPath(asString(observability.metricsPath, "/a2a/metrics"), "/a2a/metrics"),
+      metricsAuth: (asString(observability.metricsAuth, "none") === "bearer" ? "bearer" : "none") as "none" | "bearer",
       auditLogPath: resolveConfiguredPath(observability.auditLogPath, "data/audit.jsonl", resolvePath),
     },
     timeouts: {
@@ -379,6 +380,18 @@ const plugin = {
       app.get(
         config.observability.metricsPath,
         createHttpMetricsMiddleware("metrics"),
+        (req, res, next) => {
+          if (config.observability.metricsAuth === "bearer" && config.security.validTokens.size > 0) {
+            const authHeader = req.headers.authorization;
+            const header = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+            const token = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7) : "";
+            if (!token || !config.security.validTokens.has(token)) {
+              res.status(401).json({ error: "Unauthorized: invalid or missing bearer token" });
+              return;
+            }
+          }
+          next();
+        },
         (_req, res) => {
           res.json(telemetry.snapshot());
         },
