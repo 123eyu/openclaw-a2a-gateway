@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 Un plugin [OpenClaw](https://github.com/openclaw/openclaw) prêt pour la production qui implémente le [protocole A2A (Agent-to-Agent) v0.3.0](https://github.com/google/A2A), permettant aux agents OpenClaw de se découvrir et de communiquer entre eux sur différents serveurs — avec une installation sans configuration et une découverte automatique des pairs.
+
+**La seule passerelle A2A dotée d'un routage, d'une découverte et d'une résilience adaptatifs bio-inspirés — conçue pour les écosystèmes multi-agents à grande échelle.**
 
 ## Fonctionnalités clés
 
@@ -633,6 +635,34 @@ Une fois installé, dites à votre agent :
 - « Add an A2A peer »
 
 L'agent suivra automatiquement la procédure du skill.
+
+## Conception bio-inspirée
+
+Lorsque les écosystèmes multi-agents passent de 2 pairs à 20, voire 200, les passerelles A2A standard rencontrent des obstacles prévisibles : le routage choisit le mauvais pair, les disjoncteurs coupent tout le trafic, les sondages de découverte gaspillent la bande passante et la surcharge survient comme une falaise. Cette passerelle résout ces problèmes grâce à des mécanismes empruntés à la **biologie de la signalisation cellulaire** — les mêmes principes que les cellules utilisent pour router les signaux, gérer la surcharge des récepteurs et découvrir les voisins dans les tissus denses.
+
+| Biologie | Mécanisme | Fonctionnalité A2A | Référence |
+|----------|-----------|-------------------|-----------|
+| Liaison ligand-récepteur | Sigmoïde de l'équation de Hill | **Routage par score d'affinité** — scoring multi-dimensionnel avec pente (n) et seuil (Kd) configurables | Hill (1910) *J Physiol* 40 |
+| Désensibilisation des récepteurs | Phosphorylation → internalisation → recyclage | **Disjoncteur à quatre états** — dégradation graduelle (DESENSITIZED) avant blocage complet (OPEN), avec courbe de récupération exponentielle | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| Dégradation de l'AMPc | Dégradation par phosphodiestérase | **Notifications à décroissance de signal** — le score d'importance décroît exponentiellement ; abandon de la relance sous le seuil | Alon (2007) *Intro to Systems Biology* Ch.4 |
+| Quorum sensing | Seuil de concentration d'auto-inducteur | **Découverte sensible à la densité** — sondage adaptatif avec hystérésis (mode explore ↔ stable) basé sur la population de pairs | Tamsir *et al.* (2011) *Nature* 469:212 |
+| Sélection de voie de signalisation | Efficacité × vitesse de transduction | **Transport adaptatif** — scoring par transport selon le taux de succès × facteur de latence ; les transports non testés ont la priorité d'exploration | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| Saturation enzymatique | Cinétique de Michaelis-Menten | **Limitation douce de la concurrence** — délai progressif `baseDelay × load/(Km + load)` avant le mur dur de la file d'attente | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### Quand activer
+
+Toutes les fonctionnalités bio-inspirées sont **optionnelles et rétrocompatibles** — sans configuration explicite, la passerelle se comporte de manière identique aux implémentations standard. Activez-les lorsque votre déploiement dépasse les valeurs par défaut :
+
+| Fonctionnalité | Activer quand... | Clé de configuration |
+|----------------|-----------------|---------------------|
+| Routage par affinité Hill | 5+ pairs avec des compétences qui se chevauchent | `routing.affinity` |
+| Disjoncteur à quatre états | Les pairs ont des pannes intermittentes | `resilience.circuitBreaker.softThreshold` |
+| Relance à décroissance de signal | Les endpoints webhook sont instables | Activé par défaut |
+| Découverte par quorum sensing | Réseau de pairs dynamique avec DNS-SD | `discovery.quorum` |
+| Transport adaptatif | Les pairs exposent plusieurs transports | Automatique (apprend de l'utilisation) |
+| Concurrence douce MM | Opérations haute fréquence sub-seconde | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## Historique des versions
 

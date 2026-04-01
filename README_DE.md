@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 Ein produktionsreifes [OpenClaw](https://github.com/openclaw/openclaw)-Plugin, das das [A2A (Agent-to-Agent) v0.3.0 Protokoll](https://github.com/google/A2A) implementiert und es OpenClaw-Agenten ermöglicht, sich serverübergreifend zu entdecken und miteinander zu kommunizieren — mit konfigurationsfreier Installation und automatischer Peer-Erkennung.
+
+**Das einzige A2A-Gateway mit adaptivem, bioinspiriertem Routing, Discovery und Resilienz — entwickelt für Multi-Agenten-Ökosysteme im großen Maßstab.**
 
 ## Hauptmerkmale
 
@@ -633,6 +635,34 @@ Sobald installiert, sagen Sie Ihrem Agenten:
 - "Add an A2A peer"
 
 Der Agent folgt dem Verfahren des Skills automatisch.
+
+## Bioinspiriertes Design
+
+Wenn Multi-Agenten-Ökosysteme von 2 Peers auf 20 oder 200 skalieren, stoßen Standard-A2A-Gateways an vorhersehbare Grenzen: Das Routing wählt den falschen Peer, Circuit Breaker unterbrechen den gesamten Verkehr, Discovery-Polling verschwendet Bandbreite, und Überlastung trifft wie eine Wand. Dieses Gateway löst diese Probleme mit Mechanismen aus der **Zellsignalbiologie** — denselben Prinzipien, die Zellen nutzen, um Signale zu leiten, Rezeptorüberlastung zu bewältigen und Nachbarn in dichtem Gewebe zu entdecken.
+
+| Biologie | Mechanismus | A2A-Feature | Referenz |
+|----------|-------------|-------------|----------|
+| Ligand-Rezeptor-Bindung | Hill-Gleichung (Sigmoid) | **Affinitätsbasiertes Routing** — mehrdimensionales Match-Scoring mit konfigurierbarer Steilheit (n) und Schwellenwert (Kd) | Hill (1910) *J Physiol* 40 |
+| Rezeptor-Desensibilisierung | Phosphorylierung → Internalisierung → Recycling | **Vierstufiger Circuit Breaker** — graduelle Degradation (DESENSITIZED) vor vollständiger Blockierung (OPEN), mit exponentieller Erholungskurve | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| cAMP-Abbau | Phosphodiesterase-Enzymabbau | **Signalabfall-Benachrichtigungen** — Wichtigkeitsscore verfällt exponentiell; Wiederholungsversuch wird abgebrochen, wenn unter Schwellenwert | Alon (2007) *Intro to Systems Biology* Kap.4 |
+| Quorum Sensing | Autoinducer-Konzentrationschwelle | **Dichtebasierte Erkennung** — adaptives Polling mit Hysterese (Erkundungs- ↔ stabiler Modus) basierend auf Peer-Population | Tamsir *et al.* (2011) *Nature* 469:212 |
+| Signalweg-Auswahl | Pfadwirksamkeit × Transduktionsgeschwindigkeit | **Adaptiver Transport** — pro-Transport-Scoring nach Erfolgsrate × Latenzfaktor; ungetestete Pfade erhalten Erkundungspriorität | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| Enzymsättigung | Michaelis-Menten-Kinetik | **Weiche Nebenläufigkeitsbegrenzung** — progressive Verzögerung `baseDelay × load/(Km + load)` vor der harten Queue-Grenze | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### Wann aktivieren
+
+Alle bioinspirierten Features sind **optional und abwärtskompatibel** — ohne explizite Konfiguration verhält sich das Gateway identisch zu Standardimplementierungen. Aktivieren Sie sie, wenn Ihre Bereitstellung über die Standardeinstellungen hinauswächst:
+
+| Feature | Aktivieren wenn... | Konfigurationsschlüssel |
+|---------|---------------------|-------------------------|
+| Hill-Affinitätsrouting | 5+ Peers mit überlappenden Skills | `routing.affinity` |
+| Vierstufiger Circuit Breaker | Peers haben intermittierende Ausfälle | `resilience.circuitBreaker.softThreshold` |
+| Signalabfall-Retry | Webhook-Endpunkte sind unzuverlässig | Standardmäßig aktiviert |
+| Quorum-Sensing-Erkennung | Dynamische Peer-Netzwerke mit DNS-SD | `discovery.quorum` |
+| Adaptiver Transport | Peers bieten mehrere Transportwege | Automatisch (lernt aus Nutzung) |
+| MM weiche Nebenläufigkeit | Hochdurchsatz-Operationen unter einer Sekunde | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## Versionshistorie
 

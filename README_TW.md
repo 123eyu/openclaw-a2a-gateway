@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 一個正式可用的 [OpenClaw](https://github.com/openclaw/openclaw) 外掛，實作了 [A2A (Agent-to-Agent) v0.3.0 協定](https://github.com/google/A2A)，讓 OpenClaw 代理能夠跨伺服器進行探索與通訊——零設定安裝，自動對等節點探索。
+
+**目前唯一具備自適應仿生路由、發現和彈性的 A2A Gateway — 為大規模多 Agent 生態而設計。**
 
 ## 核心特性
 
@@ -633,6 +635,34 @@ skill/
 - "Add an A2A peer"
 
 代理會自動遵循技能的程序執行。
+
+## 仿生設計
+
+當多 Agent 生態從 2 個 peer 擴展到 20 甚至 200 個時，標準 A2A Gateway 會遇到可預見的瓶頸：路由選錯 peer、斷路器一刀切斷流量、探索輪詢浪費頻寬、過載像斷崖一樣突然崩潰。本 Gateway 用**細胞信號傳導**的數學模型來解決這些問題——和細胞路由信號、處理受體過載、在密集組織中發現鄰居用的是同一套原理。
+
+| 生物學 | 機制 | A2A 特性 | 參考文獻 |
+|--------|------|----------|---------|
+| 配體-受體結合 | Hill 方程 sigmoid | **親和力評分路由** — 多維度匹配評分，可配置陡峭度 (n) 和閾值 (Kd) | Hill (1910) *J Physiol* 40 |
+| 受體脫敏 | 磷酸化→內化→回收 | **四態斷路器** — 漸進降級（DESENSITIZED）後全斷（OPEN），指數恢復曲線 | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| cAMP 降解 | 磷酸二酯酶酶降解 | **信號衰減通知** — 重要性指數衰減；低於閾值自動放棄重試 | Alon (2007)《系統生物學導論》Ch.4 |
+| 群體感應 | 自誘導物濃度閾值 | **密度感知探索** — 基於 peer 數量自適應輪詢，滯後防振盪（explore ↔ stable 模式） | Tamsir *et al.* (2011) *Nature* 469:212 |
+| 信號通路選擇 | 通路效率 × 傳導速度 | **自適應傳輸** — 按成功率 × 延遲因子評分排序傳輸協定；未測試的協定優先探索 | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| 酶飽和 | Michaelis-Menten 動力學 | **軟併發限制** — 硬佇列上限前的漸進延遲 `baseDelay × load/(Km + load)` | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### 何時啟用
+
+所有仿生特性**可選且向後相容** — 不顯式配置時，Gateway 行為與標準實作完全一致。當部署規模超過預設值時啟用：
+
+| 特性 | 啟用場景 | 配置鍵 |
+|------|---------|--------|
+| Hill 親和力路由 | 5+ 個 peer 且技能有重疊 | `routing.affinity` |
+| 四態斷路器 | peer 有間歇性故障 | `resilience.circuitBreaker.softThreshold` |
+| 信號衰減重試 | webhook 端點不穩定 | 預設啟用 |
+| 群體感應探索 | 動態 peer 網路 + DNS-SD | `discovery.quorum` |
+| 自適應傳輸 | peer 暴露多種傳輸協定 | 自動（從使用中學習） |
+| MM 軟併發 | 高吞吐亞秒級操作 | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## 版本歷史
 

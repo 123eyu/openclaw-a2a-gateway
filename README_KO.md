@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 프로덕션 수준의 [OpenClaw](https://github.com/openclaw/openclaw) 플러그인으로, [A2A (Agent-to-Agent) v0.3.0 프로토콜](https://github.com/google/A2A)을 구현하여 OpenClaw 에이전트들이 서버 간에 서로를 검색하고 통신할 수 있도록 합니다. 설정 없이 설치 가능하며 피어 자동 검색을 지원합니다.
+
+**적응형 바이오 영감 라우팅, 디스커버리, 레질리언스를 갖춘 유일한 A2A 게이트웨이 — 대규모 멀티 에이전트 생태계를 위해 설계되었습니다.**
 
 ## 주요 기능
 
@@ -633,6 +635,34 @@ skill/
 - "Add an A2A peer"
 
 에이전트가 스킬의 절차를 자동으로 따릅니다.
+
+## 바이오 영감 설계
+
+멀티 에이전트 생태계가 2개 피어에서 20개, 200개로 확장되면, 표준 A2A 게이트웨이는 예측 가능한 한계에 부딪힙니다: 라우팅이 잘못된 피어를 선택하고, 서킷 브레이커가 트래픽을 완전히 차단하며, 디스커버리 폴링이 대역폭을 낭비하고, 과부하가 절벽처럼 갑자기 발생합니다. 본 게이트웨이는 **세포 신호 전달 생물학**에서 차용한 메커니즘으로 이러한 문제를 해결합니다 — 세포가 신호를 라우팅하고, 수용체 과부하를 처리하며, 밀집된 조직에서 이웃을 발견하는 것과 동일한 원리입니다.
+
+| 생물학 | 메커니즘 | A2A 기능 | 참고 문헌 |
+|--------|---------|----------|----------|
+| 리간드-수용체 결합 | Hill 방정식 시그모이드 | **친화도 스코어 라우팅** — 설정 가능한 급경사도 (n) 및 임계값 (Kd)을 갖춘 다차원 매치 스코어링 | Hill (1910) *J Physiol* 40 |
+| 수용체 탈감작 | 인산화 → 내재화 → 재활용 | **4상태 서킷 브레이커** — 완전 차단 (OPEN) 전 점진적 저하 (DESENSITIZED), 지수 회복 곡선 | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| cAMP 분해 | 포스포디에스테라제 효소 분해 | **신호 감쇠 알림** — 중요도 점수가 지수적으로 감소; 임계값 이하에서 재시도 포기 | Alon (2007) *Intro to Systems Biology* Ch.4 |
+| 쿼럼 센싱 | 자기유도물질 농도 임계값 | **밀도 인식 디스커버리** — 피어 수에 기반한 적응적 폴링과 히스테리시스 (explore ↔ stable 모드) | Tamsir *et al.* (2011) *Nature* 469:212 |
+| 신호 경로 선택 | 경로 효율 × 전달 속도 | **적응형 전송** — 성공률 × 지연 계수별 전송 스코어링; 미테스트 경로 우선 탐색 | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| 효소 포화 | Michaelis-Menten 동역학 | **소프트 동시성 제한** — 하드 큐 벽 앞의 점진적 지연 `baseDelay × load/(Km + load)` | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### 활성화 시점
+
+모든 바이오 영감 기능은 **선택 사항이며 하위 호환** — 명시적 설정 없이 게이트웨이는 표준 구현과 동일하게 동작합니다. 배포 규모가 기본값을 초과할 때 활성화하세요:
+
+| 기능 | 활성화 시점 | 설정 키 |
+|------|-----------|---------|
+| Hill 친화도 라우팅 | 5개 이상 피어의 스킬이 중복될 때 | `routing.affinity` |
+| 4상태 서킷 브레이커 | 피어에 간헐적 장애가 있을 때 | `resilience.circuitBreaker.softThreshold` |
+| 신호 감쇠 재시도 | 웹훅 엔드포인트가 불안정할 때 | 기본 활성화 |
+| 쿼럼 센싱 디스커버리 | DNS-SD를 사용하는 동적 피어 네트워크 | `discovery.quorum` |
+| 적응형 전송 | 피어가 여러 전송 방식을 노출할 때 | 자동 (사용에서 학습) |
+| MM 소프트 동시성 | 고처리량 서브초 작업 | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## 버전 기록
 

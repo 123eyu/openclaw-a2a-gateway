@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 Un plugin listo para producción de [OpenClaw](https://github.com/openclaw/openclaw) que implementa el [protocolo A2A (Agent-to-Agent) v0.3.0](https://github.com/google/A2A), permitiendo que los agentes de OpenClaw se descubran y comuniquen entre sí a través de servidores, con instalación sin configuración y descubrimiento automático de pares.
+
+**La única pasarela A2A con enrutamiento, descubrimiento y resiliencia adaptativos bioinspirados — diseñada para ecosistemas multiagente a gran escala.**
 
 ## Funcionalidades Principales
 
@@ -633,6 +635,34 @@ Una vez instalada, dile a tu agente:
 - "Add an A2A peer" / "Agregar un par A2A"
 
 El agente seguirá el procedimiento de la habilidad automáticamente.
+
+## Diseño bioinspirado
+
+Cuando los ecosistemas multiagente escalan de 2 pares a 20 o 200, las pasarelas A2A estándar encuentran obstáculos predecibles: el enrutamiento elige el par equivocado, los circuit breakers cortan todo el tráfico, el sondeo de descubrimiento desperdicia ancho de banda y la sobrecarga golpea como un precipicio. Esta pasarela resuelve estos problemas con mecanismos tomados de la **biología de señalización celular** — los mismos principios que las células usan para enrutar señales, manejar la sobrecarga de receptores y descubrir vecinos en tejido denso.
+
+| Biología | Mecanismo | Funcionalidad A2A | Referencia |
+|----------|-----------|-------------------|------------|
+| Unión ligando-receptor | Sigmoide de la ecuación de Hill | **Enrutamiento por puntuación de afinidad** — puntuación multidimensional con pendiente (n) y umbral (Kd) configurables | Hill (1910) *J Physiol* 40 |
+| Desensibilización de receptores | Fosforilación → internalización → reciclaje | **Circuit breaker de cuatro estados** — degradación gradual (DESENSITIZED) antes del bloqueo total (OPEN), con curva de recuperación exponencial | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| Degradación del AMPc | Degradación por fosfodiesterasa | **Notificaciones con decaimiento de señal** — la puntuación de importancia decae exponencialmente; reintento abandonado bajo el umbral | Alon (2007) *Intro to Systems Biology* Ch.4 |
+| Quorum sensing | Umbral de concentración de autoinductor | **Descubrimiento sensible a la densidad** — sondeo adaptativo con histéresis (modo explore ↔ stable) basado en la población de pares | Tamsir *et al.* (2011) *Nature* 469:212 |
+| Selección de vía de señalización | Eficacia × velocidad de transducción | **Transporte adaptativo** — puntuación por transporte según tasa de éxito × factor de latencia; los transportes no probados tienen prioridad de exploración | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| Saturación enzimática | Cinética de Michaelis-Menten | **Limitación suave de concurrencia** — retardo progresivo `baseDelay × load/(Km + load)` antes del muro duro de la cola | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### Cuándo activar
+
+Todas las funcionalidades bioinspiradas son **opcionales y retrocompatibles** — sin configuración explícita, la pasarela se comporta de forma idéntica a las implementaciones estándar. Actívalas cuando tu despliegue supere los valores predeterminados:
+
+| Funcionalidad | Activar cuando... | Clave de configuración |
+|---------------|-------------------|----------------------|
+| Enrutamiento por afinidad Hill | 5+ pares con habilidades superpuestas | `routing.affinity` |
+| Circuit breaker de cuatro estados | Los pares tienen fallos intermitentes | `resilience.circuitBreaker.softThreshold` |
+| Reintento con decaimiento de señal | Los endpoints de webhook son inestables | Activado por defecto |
+| Descubrimiento por quorum sensing | Red de pares dinámica con DNS-SD | `discovery.quorum` |
+| Transporte adaptativo | Los pares exponen múltiples transportes | Automático (aprende del uso) |
+| Concurrencia suave MM | Operaciones de alto rendimiento sub-segundo | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## Historial de Versiones
 

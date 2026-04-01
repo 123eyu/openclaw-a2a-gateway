@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 Un plugin [OpenClaw](https://github.com/openclaw/openclaw) pronto per la produzione che implementa il [protocollo A2A (Agent-to-Agent) v0.3.0](https://github.com/google/A2A), consentendo agli agenti OpenClaw di scoprirsi e comunicare tra loro attraverso diversi server — con installazione a configurazione zero e scoperta automatica dei peer.
+
+**L'unico gateway A2A con routing, discovery e resilienza adattivi bio-ispirati — progettato per ecosistemi multi-agente su larga scala.**
 
 ## Funzionalità Principali
 
@@ -633,6 +635,34 @@ Una volta installata, dici al tuo agente:
 - "Aggiungi un peer A2A"
 
 L'agente seguira automaticamente la procedura della skill.
+
+## Design Bio-ispirato
+
+Quando gli ecosistemi multi-agente scalano da 2 peer a 20 o 200, i gateway A2A standard incontrano ostacoli prevedibili: il routing sceglie il peer sbagliato, i circuit breaker interrompono completamente il traffico, il polling di discovery spreca banda, e il sovraccarico colpisce come un muro. Questo gateway risolve questi problemi con meccanismi presi in prestito dalla **biologia della segnalazione cellulare** — gli stessi principi che le cellule usano per instradare segnali, gestire il sovraccarico dei recettori e scoprire i vicini in tessuti densi.
+
+| Biologia | Meccanismo | Feature A2A | Riferimento |
+|----------|------------|-------------|-------------|
+| Legame ligando-recettore | Equazione di Hill (sigmoide) | **Routing basato sull'affinità** — scoring multi-dimensionale con pendenza (n) e soglia (Kd) configurabili | Hill (1910) *J Physiol* 40 |
+| Desensibilizzazione recettoriale | Fosforilazione → internalizzazione → riciclo | **Circuit breaker a quattro stati** — degradazione graduale (DESENSITIZED) prima del blocco completo (OPEN), con curva di recupero esponenziale | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| Degradazione cAMP | Decadimento enzimatico della fosfodiesterasi | **Notifiche con decadimento del segnale** — il punteggio di importanza decade esponenzialmente; il retry viene abbandonato sotto la soglia | Alon (2007) *Intro to Systems Biology* Cap.4 |
+| Quorum sensing | Soglia di concentrazione dell'autoinduttore | **Discovery consapevole della densità** — polling adattivo con isteresi (modalità esplorazione ↔ stabile) basato sulla popolazione dei peer | Tamsir *et al.* (2011) *Nature* 469:212 |
+| Selezione del pathway di segnale | Efficacia del pathway × velocità di trasduzione | **Trasporto adattivo** — scoring per trasporto basato su tasso di successo × fattore di latenza; i percorsi non testati hanno priorità di esplorazione | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| Saturazione enzimatica | Cinetica di Michaelis-Menten | **Limitazione morbida della concorrenza** — ritardo progressivo `baseDelay × load/(Km + load)` prima del limite rigido della coda | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### Quando attivare
+
+Tutte le funzionalità bio-ispirate sono **opzionali e retrocompatibili** — senza configurazione esplicita, il gateway si comporta in modo identico alle implementazioni standard. Attivale quando il tuo deployment supera le impostazioni predefinite:
+
+| Feature | Attiva quando... | Chiave di configurazione |
+|---------|-------------------|--------------------------|
+| Routing per affinità di Hill | 5+ peer con competenze sovrapposte | `routing.affinity` |
+| Circuit breaker a quattro stati | I peer hanno guasti intermittenti | `resilience.circuitBreaker.softThreshold` |
+| Retry con decadimento del segnale | Gli endpoint webhook sono inaffidabili | Attivo per impostazione predefinita |
+| Discovery con quorum sensing | Reti peer dinamiche con DNS-SD | `discovery.quorum` |
+| Trasporto adattivo | I peer espongono trasporti multipli | Automatico (apprende dall'uso) |
+| Concorrenza morbida MM | Operazioni ad alto throughput sotto il secondo | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## Cronologia delle Versioni
 

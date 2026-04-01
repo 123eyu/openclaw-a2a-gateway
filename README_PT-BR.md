@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 Um plugin pronto para produção do [OpenClaw](https://github.com/openclaw/openclaw) que implementa o [protocolo A2A (Agent-to-Agent) v0.3.0](https://github.com/google/A2A), permitindo que agentes OpenClaw descubram e se comuniquem entre si em diferentes servidores — com instalação sem configuração e descoberta automática de pares.
+
+**O único gateway A2A com roteamento, descoberta e resiliência adaptativos bioinspirados — projetado para ecossistemas multiagente em escala.**
 
 ## Principais Recursos
 
@@ -633,6 +635,34 @@ Uma vez instalada, diga ao seu agente:
 - "Adicionar um par A2A"
 
 O agente seguirá o procedimento da skill automaticamente.
+
+## Design Bioinspirado
+
+Quando ecossistemas multiagente escalam de 2 pares para 20 ou 200, gateways A2A padrão encontram barreiras previsíveis: o roteamento escolhe o par errado, circuit breakers cortam o tráfego inteiramente, polling de descoberta desperdiça largura de banda, e a sobrecarga atinge como uma parede. Este gateway resolve esses problemas com mecanismos emprestados da **biologia de sinalização celular** — os mesmos princípios que as células usam para rotear sinais, lidar com sobrecarga de receptores e descobrir vizinhos em tecidos densos.
+
+| Biologia | Mecanismo | Feature A2A | Referência |
+|----------|-----------|-------------|------------|
+| Ligação ligante-receptor | Sigmoide da equação de Hill | **Roteamento por afinidade** — scoring multidimensional com inclinação (n) e limiar (Kd) configuráveis | Hill (1910) *J Physiol* 40 |
+| Dessensibilização de receptores | Fosforilação → internalização → reciclagem | **Circuit breaker de quatro estados** — degradação gradual (DESENSITIZED) antes do bloqueio completo (OPEN), com curva de recuperação exponencial | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| Degradação de cAMP | Decaimento enzimático pela fosfodiesterase | **Notificações com decaimento de sinal** — score de importância decai exponencialmente; retry é abandonado quando abaixo do limiar | Alon (2007) *Intro to Systems Biology* Cap.4 |
+| Quorum sensing | Limiar de concentração do autoindutor | **Descoberta com consciência de densidade** — polling adaptativo com histerese (modo exploração ↔ estável) baseado na população de pares | Tamsir *et al.* (2011) *Nature* 469:212 |
+| Seleção de via de sinalização | Eficácia da via × velocidade de transdução | **Transporte adaptativo** — scoring por transporte baseado em taxa de sucesso × fator de latência; vias não testadas recebem prioridade de exploração | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| Saturação enzimática | Cinética de Michaelis-Menten | **Limitação suave de concorrência** — atraso progressivo `baseDelay × load/(Km + load)` antes do limite rígido da fila | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### Quando habilitar
+
+Todas as funcionalidades bioinspiradas são **opcionais e retrocompatíveis** — sem configuração explícita, o gateway se comporta de forma idêntica às implementações padrão. Habilite-as quando sua implantação ultrapassar as configurações padrão:
+
+| Feature | Habilitar quando... | Chave de configuração |
+|---------|----------------------|----------------------|
+| Roteamento por afinidade de Hill | 5+ pares com habilidades sobrepostas | `routing.affinity` |
+| Circuit breaker de quatro estados | Pares têm falhas intermitentes | `resilience.circuitBreaker.softThreshold` |
+| Retry com decaimento de sinal | Endpoints de webhook são não confiáveis | Habilitado por padrão |
+| Descoberta com quorum sensing | Redes de pares dinâmicas com DNS-SD | `discovery.quorum` |
+| Transporte adaptativo | Pares expõem múltiplos transportes | Automático (aprende com o uso) |
+| Concorrência suave MM | Operações de alto throughput abaixo de um segundo | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## Histórico de Versões
 

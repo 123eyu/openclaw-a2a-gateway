@@ -2,12 +2,14 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![A2A v0.3.0](https://img.shields.io/badge/A2A-v0.3.0-green.svg)](https://github.com/google/A2A)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen.svg)]()
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-blue.svg)]()
 
 [English](README.md) | [简体中文](README_CN.md) | [繁體中文](README_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Français](README_FR.md) | [Español](README_ES.md) | [Deutsch](README_DE.md) | [Italiano](README_IT.md) | [Русский](README_RU.md) | [Português (Brasil)](README_PT-BR.md)
 
 本番環境対応の [OpenClaw](https://github.com/openclaw/openclaw) プラグインで、[A2A (Agent-to-Agent) v0.3.0 プロトコル](https://github.com/google/A2A)を実装しています。OpenClaw エージェント同士がサーバーを超えて発見・通信できるようになります。設定不要のインストールと自動ピア検出に対応しています。
+
+**適応型バイオインスパイアード・ルーティング、ディスカバリー、レジリエンスを備えた唯一の A2A ゲートウェイ — 大規模マルチエージェントエコシステム向けに設計。**
 
 ## 主な機能
 
@@ -633,6 +635,34 @@ skill/
 - "Add an A2A peer"
 
 エージェントがスキルの手順に従って自動的に設定を行います。
+
+## バイオインスパイアード設計
+
+マルチエージェントエコシステムが 2 ピアから 20、さらには 200 へとスケールすると、標準的な A2A ゲートウェイは予測可能な壁にぶつかります：ルーティングが間違ったピアを選び、サーキットブレーカーがトラフィックを完全に遮断し、ディスカバリーポーリングが帯域幅を浪費し、過負荷が崖のように突然発生します。本ゲートウェイは**細胞シグナル伝達生物学**から借用したメカニズムでこれらを解決します——細胞がシグナルをルーティングし、受容体の過負荷を処理し、密な組織内で隣接細胞を発見するのと同じ原理です。
+
+| 生物学 | メカニズム | A2A 機能 | 参考文献 |
+|--------|-----------|----------|---------|
+| リガンド-受容体結合 | Hill 方程式シグモイド | **アフィニティスコアルーティング** — 設定可能な急峻度 (n) と閾値 (Kd) による多次元マッチスコアリング | Hill (1910) *J Physiol* 40 |
+| 受容体脱感作 | リン酸化→内在化→リサイクル | **4状態サーキットブレーカー** — 完全遮断 (OPEN) 前の段階的劣化 (DESENSITIZED)、指数回復曲線付き | Bhalla & Bhatt (2007) *BMC Syst Biol* 1:54 |
+| cAMP 分解 | ホスホジエステラーゼ酵素分解 | **シグナル減衰通知** — 重要度スコアが指数的に減衰；閾値以下でリトライ放棄 | Alon (2007) *Intro to Systems Biology* Ch.4 |
+| クオラムセンシング | オートインデューサー濃度閾値 | **密度認識ディスカバリー** — ピア数に基づく適応的ポーリングとヒステリシス（explore ↔ stable モード） | Tamsir *et al.* (2011) *Nature* 469:212 |
+| シグナル経路選択 | 経路効率 × 伝達速度 | **適応型トランスポート** — 成功率 × レイテンシ係数によるトランスポートごとのスコアリング；未テストの経路は探索優先 | Kholodenko (2006) *Nat Rev Mol Cell Biol* 7:165 |
+| 酵素飽和 | Michaelis-Menten 動態 | **ソフト同時実行制限** — ハードキュー壁の前に段階的遅延 `baseDelay × load/(Km + load)` | Michaelis & Menten (1913) *Biochem Z* 49:333 |
+
+### 有効化のタイミング
+
+すべてのバイオインスパイアード機能は**オプションであり後方互換** — 明示的な設定なしでは、ゲートウェイは標準実装と同一の動作をします。デフォルトを超える規模のデプロイメント時に有効化してください：
+
+| 機能 | 有効化タイミング | 設定キー |
+|------|----------------|---------|
+| Hill アフィニティルーティング | 5 以上のピアでスキルが重複 | `routing.affinity` |
+| 4 状態サーキットブレーカー | ピアに断続的な障害がある | `resilience.circuitBreaker.softThreshold` |
+| シグナル減衰リトライ | Webhook エンドポイントが不安定 | デフォルトで有効 |
+| クオラムセンシングディスカバリー | DNS-SD を使用する動的ピアネットワーク | `discovery.quorum` |
+| 適応型トランスポート | ピアが複数のトランスポートを公開 | 自動（使用状況から学習） |
+| MM ソフト同時実行 | 高スループットのサブ秒オペレーション | `limits.saturation` |
+
+> Benchmark: `node --import tsx --test tests/benchmark.test.ts`
 
 ## バージョン履歴
 
