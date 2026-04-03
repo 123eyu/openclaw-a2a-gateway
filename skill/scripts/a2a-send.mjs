@@ -3,16 +3,17 @@
  * Send a message to an A2A peer using the official @a2a-js/sdk.
  *
  * Usage:
- *   node a2a-send.mjs --peer-url <PEER_BASE_URL> --token <TOKEN> --message "Hello!"
+ *   node a2a-send.mjs --peer AntiBot --message "Hello!"
  *   node a2a-send.mjs --peer-url http://100.76.43.74:18800 --token abc123 --message "What is your name?"
- *   node a2a-send.mjs --peer-url <URL> --token <TOKEN> --message "Follow up" --task-id <TASK_ID> --context-id <CONTEXT_ID>
+ *   node a2a-send.mjs --peer AntiBot --message "Follow up" --task-id <TASK_ID> --context-id <CONTEXT_ID>
  *
  * Async task mode (recommended for long-running prompts):
- *   node a2a-send.mjs --peer-url <URL> --token <TOKEN> --non-blocking --wait --message "..."
+ *   node a2a-send.mjs --peer AntiBot --non-blocking --wait --message "..."
  *
  * Options:
- *   --peer-url <url>        Peer base URL, e.g. http://100.76.43.74:18800
- *   --token <token>         Bearer token for the peer inbound auth
+ *   --peer <name>           Peer alias from ~/.openclaw/a2a-peers.json
+ *   --peer-url <url>        Peer base URL, e.g. http://100.76.43.74:18800 (env: A2A_PEER_URL)
+ *   --token <token>         Bearer token for the peer inbound auth (env: A2A_TOKEN)
  *   --message <text>        Text to send
  *   --task-id <id>          Reuse an existing A2A task for follow-up turns
  *   --context-id <id>       Reuse an existing A2A context for multi-round conversation routing
@@ -42,8 +43,9 @@ import { GrpcTransportFactory } from "@a2a-js/sdk/client/grpc";
 import { randomUUID } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { extname } from "node:path";
+import { resolveConnection } from "./a2a-peers.mjs";
 
-const USAGE = `Usage: node a2a-send.mjs --peer-url <URL> --token <TOKEN> --message <TEXT> [--file-uri <url>] [--file-path <localpath>] [--task-id <id>] [--context-id <id>] [--non-blocking] [--wait] [--stream] [--timeout-ms <ms>] [--poll-ms <ms>] [--agent-id <openclaw-agent-id>] [--help]`;
+const USAGE = `Usage: node a2a-send.mjs [--peer <name> | --peer-url <URL>] --message <TEXT> [--file-uri <url>] [--file-path <localpath>] [--task-id <id>] [--context-id <id>] [--non-blocking] [--wait] [--stream] [--timeout-ms <ms>] [--poll-ms <ms>] [--agent-id <openclaw-agent-id>] [--help]`;
 
 const MAX_INLINE_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -106,13 +108,13 @@ function parseArgs() {
     usageAndExit(0);
   }
 
-  const peerUrl = String(opts["peer-url"] || opts.peerUrl || "").trim();
+  const peerUrl = String(opts["peer-url"] || opts.peerUrl || process.env.A2A_PEER_URL || "").trim();
   const message = String(opts.message || "").trim();
   const fileUri = String(opts["file-uri"] || opts.fileUri || "").trim();
   const filePath = String(opts["file-path"] || opts.filePath || "").trim();
 
-  // At least one of --message, --file-uri, --file-path required
-  if (!peerUrl || (!message && !fileUri && !filePath)) {
+  // Need a peer target (--peer-url, --peer alias, or A2A_PEER_URL) and at least one payload
+  if ((!peerUrl && !opts.peer) || (!message && !fileUri && !filePath)) {
     usageAndExit(1);
   }
 
@@ -121,6 +123,28 @@ function parseArgs() {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const RETRYABLE_CODES = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "UND_ERR_CONNECT_TIMEOUT", "EPIPE"]);
+
+function isRetryableError(err) {
+  const code = err?.cause?.code || err?.code || "";
+  if (RETRYABLE_CODES.has(code)) return true;
+  const msg = err?.message || "";
+  return RETRYABLE_CODES.has(msg) || msg.includes("fetch failed") || msg.includes("ECONNREFUSED");
+}
+
+async function retryOnConnectionError(fn, { maxRetries = 3, baseDelayMs = 2000 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= maxRetries || !isRetryableError(err)) throw err;
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      console.error(`Connection failed (${err?.cause?.code || err?.message}), retrying in ${(delay / 1000).toFixed(0)}s... (${attempt + 1}/${maxRetries})`);
+      await sleep(delay);
+    }
+  }
 }
 
 function extractFirstTextParts(parts) {
@@ -136,8 +160,7 @@ function extractFirstTextParts(parts) {
 async function main() {
   const opts = parseArgs();
 
-  const peerUrl = opts.peerUrl;
-  const token = typeof opts.token === "string" ? opts.token : "";
+  const { url: peerUrl, token } = resolveConnection(opts);
   const message = opts.message;
   const targetAgentId = (opts["agent-id"] || opts.agentId || "").toString().trim();
   const continuationTaskId = (opts["task-id"] || opts.taskId || "").toString().trim().slice(0, 256);
@@ -195,8 +218,8 @@ async function main() {
     })
   );
 
-  // Discover agent card and create client
-  const client = await factory.createFromUrl(peerUrl);
+  // Discover agent card and create client (with retry for transient network errors)
+  const client = await retryOnConnectionError(() => factory.createFromUrl(peerUrl));
 
   // Build message parts: text + optional file
   const outboundParts = [];
@@ -259,6 +282,8 @@ async function main() {
   // SSE streaming mode: subscribe to task event stream
   if (stream) {
     console.log("[stream] connecting...");
+    // Note: stream mode does not auto-retry — connection errors surface immediately.
+    // Retrying a partially-consumed stream has different semantics than retrying a single RPC.
     const eventStream = client.sendMessageStream(sendParams, requestOptions);
     for await (const event of eventStream) {
       const kind = event?.kind;
@@ -284,7 +309,7 @@ async function main() {
     return;
   }
 
-  const result = await client.sendMessage(sendParams, requestOptions);
+  const result = await retryOnConnectionError(() => client.sendMessage(sendParams, requestOptions));
 
   const printTaskHandle = (task) => {
     if (!task || typeof task !== "object") return;
@@ -329,7 +354,8 @@ async function main() {
   }
 
   const startedAt = Date.now();
-  const terminalStates = new Set(["completed", "failed", "canceled"]);
+  const terminalStates = new Set(["completed", "failed", "canceled", "rejected"]);
+  const blockedStates = new Set(["input-required", "auth-required"]);
 
   while (true) {
     const task = await client.getTask({ id: responseTaskId, historyLength: 20 }, requestOptions);
@@ -341,8 +367,19 @@ async function main() {
       return;
     }
 
+    if (state && blockedStates.has(state)) {
+      console.error(`\nTask is blocked (${state}). It needs external action to proceed.`);
+      console.error(`Check status later: node a2a-status.mjs --task-id ${responseTaskId}`);
+      console.log(JSON.stringify(task, null, 2));
+      process.exit(2);
+    }
+
     if (Date.now() - startedAt > timeoutMs) {
-      console.error(`Timeout waiting for task ${responseTaskId} after ${timeoutMs}ms`);
+      const elapsed = (timeoutMs / 1000).toFixed(0);
+      const lastState = task?.status?.state || "unknown";
+      console.error(`\nTimeout: task ${responseTaskId} still "${lastState}" after ${elapsed}s`);
+      console.error(`Tip: increase --timeout-ms or check status later with:`);
+      console.error(`  node a2a-status.mjs --task-id ${responseTaskId} --wait`);
       console.log(JSON.stringify(task, null, 2));
       process.exit(3);
     }
@@ -352,6 +389,35 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("Error:", err?.stack || err?.message || String(err));
+  const msg = err?.message || String(err);
+  const code = err?.cause?.code || err?.code || "";
+
+  if (code === "ECONNREFUSED" || msg.includes("ECONNREFUSED")) {
+    console.error(`Connection refused — peer is not reachable.`);
+    console.error(`  1. Check if the peer is running: curl -s <peer-url>/.well-known/agent-card.json`);
+    console.error(`  2. Verify the URL: --peer-url or A2A_PEER_URL`);
+    console.error(`  3. Check network/firewall (Tailscale connected?)`);
+    process.exit(1);
+  }
+
+  if (code === "ETIMEDOUT" || code === "UND_ERR_CONNECT_TIMEOUT" || msg.includes("ETIMEDOUT")) {
+    console.error(`Connection timed out — peer is not responding.`);
+    console.error(`  Network path may be blocked or peer is overloaded.`);
+    process.exit(1);
+  }
+
+  if (code === "ENOTFOUND" || msg.includes("ENOTFOUND")) {
+    console.error(`DNS lookup failed — hostname not found.`);
+    console.error(`  Check the peer URL for typos (--peer-url or A2A_PEER_URL).`);
+    process.exit(1);
+  }
+
+  if (msg.includes("401") || msg.includes("Unauthorized")) {
+    console.error(`Authentication failed (401) — token is invalid or expired.`);
+    console.error(`  Update --token or A2A_TOKEN env var.`);
+    process.exit(1);
+  }
+
+  console.error("Error:", err?.stack || msg);
   process.exit(1);
 });
